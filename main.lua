@@ -8,6 +8,10 @@ function love.keypressed(key)
 	player.keypressed(key)
 end
 
+-- load
+function love.load()
+    Font = love.graphics.newFont("assets/fonts/PressStart2P-Regular.ttf", 24)
+end
 
 -- main loop
 function love.update(dt)
@@ -17,6 +21,7 @@ function love.update(dt)
 end
 
 function love.draw()
+    love.graphics.setFont(Font)
 	-- player
 	player.draw()
 

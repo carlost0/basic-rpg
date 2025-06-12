@@ -210,9 +210,10 @@ function player.draw()
 
 	-- Draw player hp and score
 	love.graphics.setColor(0.17, 0.17, 0.17, 1)
-	love.graphics.rectangle("fill", 40, 40, 200, 20)
+	love.graphics.rectangle("fill", 1000, 900, 300, 30)
 	love.graphics.setColor(1, 0, 0, 1)
-	love.graphics.rectangle("fill", 40, 40, player.hp * 2, 20)
+	love.graphics.rectangle("fill", 1000, 900, player.hp * 3, 30)
+    love.graphics.print("HP: " .. player.hp .. "/100", 1050, 950, 0, 2, 2)
 end
 
 return player

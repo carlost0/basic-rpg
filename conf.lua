@@ -3,6 +3,6 @@ function love.conf(t)
     t.version = "11.3"
     t.console = true
 
-    t.window.width = 1000
+    t.window.width = 1330
     t.window.height = 1000
 end
