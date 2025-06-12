@@ -1,21 +1,19 @@
 local enemy = {}
 
--- Breaking circular dependency by removing direct require
--- Will access player through function parameters instead
 local collision = require("src.collision")
-local wall = require("src.walls")
 
 -- enemy variables
 enemy.amount = 0
+enemy.count = 2
+enemy.wave = 0
 enemy.creatures = {} -- Store all enemy instances here
+
+-- general variables
+local timer = 0
 
 -- spawn enemies
 function enemy.spawn(amount)
-	for i = 0, amount do
-		if enemy.amount == amount then
-			return
-		end
-
+	for i = 1, amount do
 		local width = math.random(20, 40)
 		local creature = {
 			dir = math.random(0, 3),
@@ -26,50 +24,53 @@ function enemy.spawn(amount)
 			width = width,
 			height = width,
 
-			speed = math.random(300, 500),
+			speed = (100 / (width * 1.5)) * 50,
 
-			hp = math.random(50, 120),
+			hp = width,
+
+            score = width * math.random(0.5, 1.5) + 3
 		}
 		table.insert(enemy.creatures, creature)
-
-		enemy.amount = enemy.amount + 1
 	end
+
+	enemy.amount = amount
+	enemy.count = amount
 end
 
+-- reset all enemies
+function enemy.reset(all)
+    enemy.creatures = {}
+    enemy.amount = 0
+    if all then
+        enemy.count = 2
+    else
+        enemy.count = 0
+    end
+end
 -- move enemy
-function enemy.movement_man(dt)
+function enemy.movement_man(dt, player)
 	for i, creature in ipairs(enemy.creatures) do
-		-- Fixed the direction conditions (you had dir == 1 twice)
-		if creature.dir == 0 then
-			creature.x = creature.x + creature.speed * dt
-		elseif creature.dir == 1 then
-			creature.x = creature.x - creature.speed * dt
-		elseif creature.dir == 2 then
-			creature.y = creature.y + creature.speed * dt
-		elseif creature.dir == 3 then
-			creature.y = creature.y - creature.speed * dt
-		end
+        local dx = player.x - creature.x
+        local dy = player.y - creature.y
+        local dist = math.sqrt(dx * dx + dy * dy)
 
-		if creature.x <= 0 then
-			creature.x = 1000
-		elseif creature.x >= 1000 then
-			creature.x = 0
-		elseif creature.y <= 0 then
-			creature.y = 1000
-		elseif creature.y >= 1000 then
-			creature.y = 0
-		end
-
-		creature.dir = math.random(0, 3)
+        if dist > 0 then
+            creature.x = creature.x + (dx / dist) * creature.speed * dt
+            creature.y = creature.y + (dy / dist) * creature.speed * dt
+        end
 	end
 end
+
+
 -- manage hp
 function enemy.hp_man(player_projectile, player)
 	if not player_projectile then
 		return false
 	end
 
-	for i, creature in ipairs(enemy.creatures) do
+	for i = #enemy.creatures, 1, -1 do
+        local creature = enemy.creatures[i]
+
 		local projectile_box = {
 			x = player_projectile.x,
 			y = player_projectile.y,
@@ -81,28 +82,39 @@ function enemy.hp_man(player_projectile, player)
 			goto continue
 		end
 
-		creature.hp = creature.hp - 1
+		creature.hp = creature.hp - 2
 
-		if creature.hp <= 0 or collision.check(player, creature) then
+		if creature.hp <= 0 then
 			table.remove(enemy.creatures, i)
-			enemy.amount = enemy.amount - 1
+			enemy.count = enemy.count - 1
 		end
-
-		::continue::
+        ::continue::
 	end
 end
 
+function enemy.wave_man()
+    if enemy.count <= 0 or enemy.wave == 0 then
+        enemy.wave = enemy.wave + 1
+        enemy.reset(false)
+        local next_wave_amount = 2 + enemy.wave * 2
+        enemy.spawn(next_wave_amount)
+    end
+end
 -- look if enemy is in wall
-function check_wall()
-	for i, creature in ipairs(enemy.creeatures) do
-		for i, wall in ipairs(wall) do
-			if collision.check(creature, wall) then
-				creature.x = math.random(20, 980)
-				creature.y = math.random(20, 980)
+
+function enemy.check_wall(walls)
+	for _, creature in ipairs(enemy.creatures) do
+		for _, circle in ipairs(walls.circles) do
+			if not collision.check_circle(creature, circle) then
+				-- Teleport enemy to a new random position
+				creature.x = math.random(0, 1000)
+				creature.y = math.random(0, 1000)
+				break
 			end
 		end
 	end
 end
+
 
 -- Draw all enemies
 function enemy.draw()

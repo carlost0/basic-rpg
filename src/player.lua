@@ -20,7 +20,8 @@ player.height = 50
 
 -- hp
 player.hitbox = nil
-player.hp = 5
+player.hp = 100
+player.damage_interval = 0.75
 
 -- score
 player.score = 0
@@ -31,6 +32,36 @@ player.projectile = nil
 -- last attack direction
 player.last_attack_key = nil
 
+-- general variables
+
+local timer = 0
+
+-- reset function
+function player.reset()
+	-- movement
+	player.speed = config.player_speed
+	player.x = 500
+	player.y = 500
+
+	-- size
+	player.width = 50
+	player.height = 50
+
+	-- hp
+	player.hitbox = nil
+	player.hp = 100
+	player.damage_interval = 0.75
+
+	-- score
+	player.score = 0
+	-- projectile variables
+	player.projectile_speed = config.projectile_speed
+	player.projectile = nil
+
+	-- last attack direction
+	player.last_attack_key = nil
+	enemy.reset(true)
+end
 -- handle keypresses
 function player.keypressed(key)
 	if key == "i" or key == "j" or key == "k" or key == "l" then
@@ -40,9 +71,10 @@ end
 
 -- enemy manager (due to dependency shit it is here)
 function player.enemy_man(dt)
-	enemy.spawn(2)
 	enemy.hp_man(player.projectile, player)
-	enemy.movement_man(dt)
+	enemy.movement_man(dt, player)
+	enemy.check_wall(walls)
+    enemy.wave_man()
 end
 
 -- spawn projectile
@@ -76,28 +108,11 @@ function player.update_projectile(dt)
 	player.projectile.lifetime = player.projectile.lifetime - dt
 
 	-- Check if projectile hits an enemy
-	if player.projectile and enemy.hp_man(player.projectile) then
+	if player.projectile and enemy.hp_man(player.projectile, player) then
 		player.projectile = nil -- Destroy projectile on hit
 	elseif player.projectile and player.projectile.lifetime <= 0 then
 		player.projectile = nil
 	end
-
-	-- check if projectile goes out of bounds
-	if player.projectile == nil then
-		goto continue
-	end
-
-	if player.projectile.x > 0 then
-		player.projectile.x = 1000
-	elseif player.projectile.x < 1000 then
-		player.projectile.x = 0
-	elseif player.projectile.y > 0 then
-		player.projectile.y = 1000
-	elseif player.projectile.y < 1000 then
-		player.projectile.y = 0
-	end
-
-	::continue::
 end
 
 -- player movement
@@ -127,58 +142,18 @@ function player.movement_man(dt)
 end
 
 -- player collision
-function player.collision_man(old_x, old_y)
-	-- player => wall
-	for _, wall in ipairs(walls) do
-		local wall_box = {
-			x = wall.x,
-			y = wall.y,
-			width = wall.width,
-			height = wall.height,
-		}
-
-		local player_box = {
-			x = player.x,
-			y = player.y,
-			width = player.width,
-			height = player.height,
-		}
-
-		if collision.check(player_box, wall_box) then
-			player.x = old_x
-			player.y = old_y
-			break
-		end
-	end
-
-	-- projectile => wall
-	for _, wall in ipairs(walls) do
-		if not player.projectile then
-			break
-		end
-
-		local wall_box = {
-			x = wall.x,
-			y = wall.y,
-			width = wall.width,
-			height = wall.height,
-		}
-
-		local projectile_box = {
-			x = player.projectile.x,
-			y = player.projectile.y,
-			width = 10,
-			height = 10,
-		}
-
-		if collision.check(projectile_box, wall_box) then
-			player.projectile = nil
-			break
-		end
-	end
+function player.collision_man(old_x, old_y, dt)
+    for _, circle in ipairs(walls.circles) do
+        if not collision.check_circle(player, circle) then
+            player.x = 500
+            player.y = 500
+        end 
+    end
 
 	-- player => enemy
 	local enemies = enemy.get_creatures()
+
+	timer = timer + dt
 
 	for _, creature in ipairs(enemies) do
 		local player_box = {
@@ -188,8 +163,9 @@ function player.collision_man(old_x, old_y)
 			height = player.height,
 		}
 
-		if collision.check(player_box, creature) then
+		if collision.check(player_box, creature) and timer >= player.damage_interval then
 			player.hp = player.hp - 1
+			timer = timer - player.damage_interval
 		end
 	end
 end
@@ -203,7 +179,7 @@ function player.man(dt)
 	player.movement_man(dt)
 
 	-- Handle collision (revert to old_x/y if needed)
-	player.collision_man(old_x, old_y)
+	player.collision_man(old_x, old_y, dt)
 
 	-- Update projectile
 	player.update_projectile(dt)
@@ -214,16 +190,14 @@ function player.man(dt)
 		player.last_attack_key = nil -- reset to prevent repeat spawns
 	end
 
+	if player.hp <= 0 then
+		player.reset()
+	end
 	player.enemy_man(dt)
 end
 
 -- Draw player and projectile
 function player.draw()
-	-- Write player hp and score
-	love.graphics.setColor(1, 0, 0, 1)
-	love.graphics.setFont(hp_font)
-	love.graphics.print(player.hp, 10, 10)
-
 	-- Draw player
 	love.graphics.setColor(0, 1, 0, 1)
 	love.graphics.rectangle("fill", player.x, player.y, player.width, player.height)
@@ -233,6 +207,12 @@ function player.draw()
 		love.graphics.setColor(1, 1, 0, 1)
 		love.graphics.rectangle("fill", player.projectile.x, player.projectile.y, 10, 10)
 	end
+
+	-- Draw player hp and score
+	love.graphics.setColor(0.17, 0.17, 0.17, 1)
+	love.graphics.rectangle("fill", 40, 40, 200, 20)
+	love.graphics.setColor(1, 0, 0, 1)
+	love.graphics.rectangle("fill", 40, 40, player.hp * 2, 20)
 end
 
 return player
