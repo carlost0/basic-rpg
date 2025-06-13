@@ -30,10 +30,10 @@ player.projectile_speed = config.projectile_speed
 player.projectile = nil
 
 -- last attack direction
-player.last_attack_key = nil
+local cursor = {}
+cursor.x, cursor.y = love.mouse.getPosition()
 
 -- general variables
-
 local timer = 0
 
 -- reset function
@@ -59,14 +59,7 @@ function player.reset()
 	player.projectile = nil
 
 	-- last attack direction
-	player.last_attack_key = nil
 	enemy.reset(true)
-end
--- handle keypresses
-function player.keypressed(key)
-	if key == "i" or key == "j" or key == "k" or key == "l" then
-		player.last_attack_key = key
-	end
 end
 
 -- enemy manager (due to dependency shit it is here)
@@ -78,39 +71,50 @@ function player.enemy_man(dt)
 end
 
 -- spawn projectile
-function player.spawn_projectile(dir)
+function player.spawn_projectile()
 	player.projectile = {
 		x = player.x + 25,
 		y = player.y + 25,
-		dir = dir,
-		lifetime = 0.5, -- seconds
+		lifetime = 1, -- seconds
 		width = 10,
 		height = 10,
 	}
 end
 
+function get_cursor()
+    local curs = {}
+    curs.x, curs.y = love.mouse.getPosition()
+    return curs
+end
+
 -- update projectile
 function player.update_projectile(dt)
+    local cursor = get_cursor()
+
+    if love.mouse.isDown(1) and projectile == nil then 
+        player.spawn_projectile()
+    end
+
 	if not player.projectile then
 		return
 	end
+    
+    player.projectile.lifetime = player.projectile.lifetime - dt
 
-	if player.projectile.dir == "i" then
-		player.projectile.y = player.projectile.y - player.projectile_speed * dt
-	elseif player.projectile.dir == "k" then
-		player.projectile.y = player.projectile.y + player.projectile_speed * dt
-	elseif player.projectile.dir == "j" then
-		player.projectile.x = player.projectile.x - player.projectile_speed * dt
-	elseif player.projectile.dir == "l" then
-		player.projectile.x = player.projectile.x + player.projectile_speed * dt
-	end
+	local dx = cursor.x - player.projectile.x
+    local dy = cursor.y - player.projectile.y
 
-	player.projectile.lifetime = player.projectile.lifetime - dt
+    local dist = math.sqrt(dx * dx + dy * dy)
 
-	-- Check if projectile hits an enemy
+    if dist > 0 then
+        player.projectile.x = player.projectile.x + (dx / dist) * player.projectile_speed * dt
+        player.projectile.y = player.projectile.y + (dy / dist) * player.projectile_speed * dt
+    end
+
+    -- Check if projectile hits an enemy
 	if player.projectile and enemy.hp_man(player.projectile, player) then
 		player.projectile = nil -- Destroy projectile on hit
-	elseif player.projectile and player.projectile.lifetime <= 0 then
+	elseif player.projectile and player.projectile.lifetime <= 0 or (player.projectile.x == cursor.x and player.projectile.y == cursor.y) then
 		player.projectile = nil
 	end
 end
@@ -147,7 +151,11 @@ function player.collision_man(old_x, old_y, dt)
         if not collision.check_circle(player, circle) then
             player.x = 500
             player.y = 500
-        end 
+        end
+
+        if not collision.check_circle(player.projectile, circle) then 
+            player.projectile = nil
+        end
     end
 
 	-- player => enemy
@@ -184,12 +192,6 @@ function player.man(dt)
 	-- Update projectile
 	player.update_projectile(dt)
 
-	-- attack
-	if not player.projectile and player.last_attack_key then
-		player.spawn_projectile(player.last_attack_key)
-		player.last_attack_key = nil -- reset to prevent repeat spawns
-	end
-
 	if player.hp <= 0 then
 		player.reset()
 	end
@@ -213,7 +215,7 @@ function player.draw()
 	love.graphics.rectangle("fill", 1000, 900, 300, 30)
 	love.graphics.setColor(1, 0, 0, 1)
 	love.graphics.rectangle("fill", 1000, 900, player.hp * 3, 30)
-    love.graphics.print("HP: " .. player.hp .. "/100", 1050, 950, 0, 2, 2)
+    love.graphics.print("HP: " .. player.hp .. "/100", 1025, 950)
 end
 
 return player
